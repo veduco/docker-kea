@@ -1,0 +1,57 @@
+FROM alpine:3.22
+
+RUN apk --no-cache upgrade
+
+RUN apk add --no-cache \
+    bash \
+    curl
+
+ARG KEA_BRANCH='3-0'
+ARG KEA_VERSION
+RUN if [ ! -z "${KEA_VERSION}" ]; then KEA_BRANCH="$(echo ${KEA_VERSION%%-*} | cut -d. -f 1)-$(echo ${KEA_VERSION%%-*} | cut -d. -f 2)"; fi && \
+    curl -1sLf "https://dl.cloudsmith.io/public/isc/kea-${KEA_BRANCH}/setup.alpine.sh" | bash
+
+ARG KEA_ADMIN=true
+ARG PG_INSTALL_VERSION=17
+ENV KEA_EXECUTABLE=dhcp4
+RUN --mount=type=secret,id=aptCacher,env=aptCacher \
+    [ ! -z "${aptCacher}" ] && sed -i -E "s|https://(dl.cloudsmith.io)|https://${aptCacher}/HTTPS///\1|g" /etc/apk/repositories || true ; \
+    apk add --no-cache \
+        isc-kea-${KEA_EXECUTABLE}$([ ! -z "${KEA_VERSION}" ] && echo "=${KEA_VERSION}") \
+        isc-kea-hooks \
+        isc-kea-pgsql \
+        isc-kea-mysql
+
+RUN --mount=type=secret,id=aptCacher,env=aptCacher \
+    [ ! -z "${aptCacher}" ] && sed -i -E "s|https://(dl.cloudsmith.io)|https://${aptCacher}/HTTPS///\1|g" /etc/apk/repositories || true ; \
+    [ "${KEA_ADMIN}" = true ] && apk add --no-cache \
+        isc-kea-admin$([ ! -z "${KEA_VERSION}" ] && echo "=${KEA_VERSION}") \
+        postgresql${PG_INSTALL_VERSION}-client \
+        mariadb-client
+
+    #isc-kea-gss-tsig
+    #isc-kea-perfdhcp
+    #isc-kea-dhcp-ddns
+
+RUN sed -i -E -e '/dl.cloudsmith.io/d' -e '/^\s*#/d' -e '/^\s*$/d' /etc/apk/repositories
+RUN rm -rf /var/cache/apk/*
+
+ENV KEA_USER=100 \
+    KEA_GROUP=101 \
+    KEA_DHCP_DATA_DIR=/kea/leases \
+    KEA_LOG_FILE_DIR=/kea/logs \
+    KEA_LEGAL_LOG_DIR=/kea/logs \
+    KEA_CONTROL_SOCKET_DIR=/kea/sockets
+
+RUN install -m 0750 -o ${KEA_USER} -g ${KEA_GROUP} -d \
+    /kea \
+    /kea/config \
+    ${KEA_DHCP_DATA_DIR} \
+    ${KEA_LOG_FILE_DIR} \
+    ${KEA_LEGAL_LOG_DIR} \
+    ${KEA_CONTROL_SOCKET_DIR} \
+    && \
+    mkdir /entrypoint.d
+
+COPY entrypoint.sh /
+ENTRYPOINT [ "/entrypoint.sh" ]
