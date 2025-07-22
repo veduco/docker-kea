@@ -1,0 +1,212 @@
+name: "Multiarch"
+run-name: "kea-${{ inputs.binary }}/all"
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        type: boolean
+        description: Publish release
+      binary:
+        type: choice
+        description: Binary to use
+        options:
+          - dhcp4
+          - dhcp6
+      branchVer:
+        type: choice
+        description: Branch version
+        options:
+          - 3.0
+          - 2.6
+          - 2.4
+      version:
+        type: string
+        description: Use specific version
+      admin:
+        type: boolean
+        description: Include kea-admin?
+        default: true
+
+  workflow_call:
+    inputs:
+      publish:
+        type: boolean
+        required: true
+      binary:
+        type: string
+        required: true
+      branchVer:
+        type: string
+      version:
+        type: string
+      admin:
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  packages: write
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  baseVars:
+    runs-on: ubuntu-24.04
+    outputs:
+      vKEA_full: ${{ steps.version.outputs.vKEA_full }}
+      vKEA_semVer: ${{ steps.version.outputs.vKEA_semVer }}
+      vKEA_branchVer: ${{ steps.version.outputs.vKEA_branchVer }}
+      vKEA_major: ${{ steps.version.outputs.vKEA_major }}
+      vKEA_minor: ${{ steps.version.outputs.vKEA_minor }}
+      vKEA_patch: ${{ steps.version.outputs.vKEA_patch }}
+      revision: ${{ steps.version.outputs.revision }}
+    steps:
+      - name: Print inputs
+        run: echo "${{ toJSON(inputs) }}"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get Kea version
+        id: version
+        run: | # shell
+          if [ -z "${{ inputs.version }}" ]; then
+            # No version provided override provided.
+            # Build based on chosen branch version.
+            inputBranch=${{ inputs.branchVer }}
+            inputBranch=${inputBranch/./-}
+            # Get full_version from Debian
+            full_version=$(curl -sLo - https://dl.cloudsmith.io/public/isc/kea-${inputBranch}/deb/debian/dists/bookworm/main/binary-amd64/Packages.gz | \
+              gunzip | \
+              grep -A2 '^Package: isc-kea-${{ inputs.binary }}$' | \
+              grep Version | \
+              sed -E 's/^Version:\s+//g' | \
+              sort | uniq | \
+              tail -1)
+          else
+            # Specific version was provided
+            full_version="${{ inputs.version }}"
+          fi
+
+          semVer=${full_version%%-*}
+          branchVer="$(echo ${semVer} | cut -d. -f 1)-$(echo ${semVer} | cut -d. -f 2)"
+          vKEA_major=$(echo ${semVer} | cut -d. -f 1)
+          vKEA_minor=$(echo ${semVer} | cut -d. -f 2)
+          vKEA_patch=$(echo ${semVer} | cut -d. -f 3)
+
+          echo "vKEA_full=${full_version}"   | tee -a "$GITHUB_OUTPUT"
+          echo "vKEA_semVer=${semVer}"       | tee -a "$GITHUB_OUTPUT"
+          echo "vKEA_branchVer=${branchVer}" | tee -a "$GITHUB_OUTPUT"
+          echo "vKEA_major=${vKEA_major}"    | tee -a "$GITHUB_OUTPUT"
+          echo "vKEA_minor=${vKEA_minor}"    | tee -a "$GITHUB_OUTPUT"
+          echo "vKEA_patch=${vKEA_patch}"    | tee -a "$GITHUB_OUTPUT"
+          echo "revision=$(echo ${full_version##*-} | sed -E 's/(isc|r)//g')" | tee -a $GITHUB_OUTPUT
+
+      - name: Set postgres version
+        id: postgres
+        run: |
+          echo "vPostgres=${{ env.POSTGRES_VERSION }}" | tee -a "$GITHUB_OUTPUT"
+
+  allArch:
+    if: ${{ always() && !(cancelled() || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'failure')) }}
+    needs: baseVars
+    strategy:
+      fail-fast: true
+      matrix:
+        job:
+          - os: "trixie"
+            architecture: "amd64"
+            version: ${{ needs.baseVars.outputs.vKEA_semVer }}-isc${{ needs.baseVars.outputs.revision }}
+          - os: "trixie"
+            architecture: "arm64"
+            version: ${{ needs.baseVars.outputs.vKEA_semVer }}-isc${{ needs.baseVars.outputs.revision }}
+          - os: "alpine"
+            architecture: "amd64"
+            version: ${{ needs.baseVars.outputs.vKEA_semVer }}-r${{ needs.baseVars.outputs.revision }}
+          - os: "alpine"
+            architecture: "arm64"
+            version: ${{ needs.baseVars.outputs.vKEA_semVer }}-r${{ needs.baseVars.outputs.revision }}
+    uses: ./.github/workflows/build_image.yml
+    secrets: inherit
+    with:
+      publish: ${{ inputs.publish }}
+      binary: ${{ inputs.binary }}
+      branchVer: ${{ needs.baseVars.outputs.vKEA_branchVer }}
+      version: ${{ matrix.job.version }}
+      admin: ${{ inputs.admin }}
+      os: ${{ matrix.job.os }}
+      architecture: ${{ matrix.job.architecture }}
+
+  merge_platform_containers:
+    if: ${{ always() && inputs.publish && !(cancelled() || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'failure')) }}
+    name: Merge Platform Containers
+    runs-on: ubuntu-24.04
+    needs: [baseVars, allArch]
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [ "debian", "alpine" ]
+    steps:
+      - name: Set our env vars
+        run: |
+          echo "vKEA_full=${{ needs.baseVars.outputs.vKEA_full }}"           | tee -a $GITHUB_ENV
+          echo "vKEA_semVer=${{ needs.baseVars.outputs.vKEA_semVer }}"       | tee -a $GITHUB_ENV
+          echo "vKEA_branchVer=${{ needs.baseVars.outputs.vKEA_branchVer }}" | tee -a $GITHUB_ENV
+          echo "vKEA_major=${{ needs.baseVars.outputs.vKEA_major }}"         | tee -a $GITHUB_ENV
+          echo "vKEA_minor=${{ needs.baseVars.outputs.vKEA_minor }}"         | tee -a $GITHUB_ENV
+          echo "vKEA_patch=${{ needs.baseVars.outputs.vKEA_patch }}"         | tee -a $GITHUB_ENV
+          echo "revision=${{ needs.baseVars.outputs.revision }}"             | tee -a $GITHUB_ENV
+
+      - name: Download Digests
+        uses: actions/download-artifact@v4
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digests-*
+          merge-multiple: true
+
+      - name: Move digests
+        run: |
+          mkdir -p ${{ runner.temp }}/digests/${{ matrix.os }}
+          cd ${{ runner.temp }}/digests/
+          for file in $(ls ${{ matrix.os }}_*); do mv ${file} ${{ matrix.os }}/$(echo "${file}" | sed 's/.*_//'); done
+
+      - name: Login to container registry
+        if: ${{ inputs.publish }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.CONTAINER_REGISTRY }}
+          username: ${{ secrets.CONTAINER_REGISTRY_USER }}
+          password: ${{ secrets.CONTAINER_REGISTRY_PASS }}
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ secrets.CONTAINER_REGISTRY }}/${{ secrets.CONTAINER_REGISTRY_PROJECT }}/kea-${{ inputs.binary }}
+          flavor: |
+            latest=false
+            prefix=
+            suffix=${{ matrix.os == 'alpine' && '-alpine' || '' }}
+          labels: |
+            maintainer=${{ github.repository_owner }}
+          tags: |
+            type=raw,value=${{ env.vKEA_semVer }}-${{ env.revision }}
+            type=raw,value=${{ env.vKEA_major }}.${{ env.vKEA_minor }}
+            type=raw,value=${{ env.vKEA_semVer }}
+
+      - name: Create manifest list and push, ${{ matrix.os }}
+        working-directory: ${{ runner.temp }}/digests/${{ matrix.os }}
+        run: |
+          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ secrets.CONTAINER_REGISTRY }}/${{ secrets.CONTAINER_REGISTRY_PROJECT }}/kea-${{ inputs.binary }}@sha256:%s ' *)
+
+      - name: Inspect Image
+        run: |
+          docker buildx imagetools inspect ${{ secrets.CONTAINER_REGISTRY }}/${{ secrets.CONTAINER_REGISTRY_PROJECT }}/kea-${{ inputs.binary }}:${{ steps.meta.outputs.version }}
