@@ -1,0 +1,105 @@
+name: "Check for Updates"
+run-name: "Check Version [${{ inputs.branchVer }}]"
+
+on:
+  workflow_dispatch:
+    inputs:
+      branchVer:
+        type: choice
+        description: Branch version
+        options:
+          - 3.0
+          - 2.6
+          - 2.4
+
+permissions:
+  contents: read
+  packages: write
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+    check:
+        runs-on: ubuntu-24.04
+        outputs:
+            newVersion: ${{ steps.setoutputs.outputs.newVersion }}
+        steps:
+            - name: Print inputs
+              run: echo "${{ toJSON(inputs) }}"
+
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Get Kea version
+              run: | # shell
+                inputBranch=${{ inputs.branchVer }}
+                inputBranch=${inputBranch/./-}
+                # for example, produces "3.0.0-isc20250717111736"
+                debian_full_version=$(curl -sLo - https://dl.cloudsmith.io/public/isc/kea-${inputBranch}/deb/debian/dists/bookworm/main/binary-amd64/Packages.gz | \
+                    gunzip | \
+                    grep -A2 '^Package: isc-kea-dhcp4$' | \
+                    grep Version | \
+                    sed -E 's/^Version:\s+//g' | \
+                    sort | uniq | \
+                    tail -1)
+                # for example, produces "3.0.0-r20250717111736"
+                alpine_full_version=$(curl -sLo - https://dl.cloudsmith.io/public/isc/kea-${inputBranch}/alpine/v3.22/main/x86_64/APKINDEX.tar.gz | \
+                    tar xOz APKINDEX | \
+                    grep -A 1 P:isc-kea-dhcp4 | \
+                    grep 'V:' | \
+                    sed 's/V://g' | \
+                    sort | uniq | \
+                    tail -1)
+
+                echo "debian_full_version=${debian_full_version}" | tee -a $GITHUB_ENV
+                echo "alpine_full_version=${alpine_full_version}" | tee -a $GITHUB_ENV
+        
+            - name: Get committed version
+              run: | # shell
+                echo "jq_debian=$(jq -r '.["${{ inputs.branchVer }}"].debian' versions.json)" | tee -a $GITHUB_ENV
+                echo "jq_alpine=$(jq -r '.["${{ inputs.branchVer }}"].alpine' versions.json)" | tee -a $GITHUB_ENV
+
+            - name: Compare versions
+              run: | # shell
+                newVersion="false"
+                [ ! "${debian_full_version}" == "${jq_debian}" ] && \
+                    [ $(echo -e "${debian_full_version}\n${jq_debian}" | sort | uniq | tail -1) == "${debian_full_version}" ] && \
+                    [ "${newVersion}" == "false" ] && \
+                    newVersion="${debian_full_version}" || true
+                [ ! "${alpine_full_version}" == "${jq_alpine}" ] && \
+                    [ $(echo -e "${alpine_full_version}\n${jq_alpine}" | sort | uniq | tail -1) == "${alpine_full_version}" ] && \
+                    [ "${newVersion}" == "false" ] && \
+                    newVersion="${alpine_full_version}" || true
+
+                content=$(jq ".[\"${{ inputs.branchVer }}\"].debian = \"${debian_full_version}\" | .[\"${{ inputs.branchVer }}\"].alpine = \"${alpine_full_version}\"" versions.json) && \
+                    echo -E "${content}" > versions.json
+
+                echo "newVersion=${newVersion}" | tee -a $GITHUB_ENV
+                echo "revision=$(echo ${newVersion##*-} | sed -E 's/(isc|r)//g')" | tee -a $GITHUB_ENV
+
+            - name: Commit changes
+              if: ${{ env.newVersion != 'false' }}
+              uses: EndBug/add-and-commit@v9
+              with:
+                add: versions.json
+                default_author: github_actions
+                message: "Update versions to ${{ env.revision }}"
+
+            - name: Set outputs
+              id: setoutputs
+              run: |
+                echo "newVersion=${newVersion}" | tee -a "$GITHUB_OUTPUT"
+
+    callworkflow:
+        if: ${{ needs.check.outputs.newVersion != 'false' && !(cancelled() || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'failure')) }}
+        needs: [check]
+        uses: ./.github/workflows/multiarch.yml
+        secrets: inherit
+        with:
+            publish: true
+            binary: dhcp4
+            branchVer: ${{ inputs.branchVer }}
+            version: ${{ needs.check.outputs.newVersion }}
+            admin: true
