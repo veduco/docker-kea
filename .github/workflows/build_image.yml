@@ -40,6 +40,14 @@ on:
         options:
           - amd64
           - arm64
+      cacheInvalidatorUpgrade:
+        type: boolean
+        default: true
+        description: Cause apt upgrade
+      cacheInvalidator:
+        type: boolean
+        default: false
+        description: Invalidate all cache
 
   workflow_call:
     inputs:
@@ -61,6 +69,12 @@ on:
         required: true
       architecture:
         type: string
+        required: true
+      cacheInvalidatorUpgrade:
+        type: boolean
+        required: true
+      cacheInvalidator:
+        type: boolean
         required: true
 
 permissions:
@@ -151,6 +165,14 @@ jobs:
             *) exit 1
           esac
 
+      - name: Set cache invalidations
+        run: | # shell
+          [ ${{ inputs.cacheInvalidatorUpgrade }} = true ] && cacheInvalidatorUpgrade="$(date +%s%3N)" || cacheInvalidatorUpgrade=''
+          [ ${{ inputs.cacheInvalidator }} = true ]        && cacheInvalidator="$(date +%s%3N)"        || cacheInvalidator=''
+
+          echo "cacheInvalidatorUpgrade=${cacheInvalidatorUpgrade}" | tee -a $GITHUB_ENV
+          echo "cacheInvalidator=${cacheInvalidator}" | tee -a $GITHUB_ENV
+
       - name: Set up Docker Buildx
         id: buildx
         uses: docker/setup-buildx-action@v3
@@ -193,6 +215,7 @@ jobs:
             "KEA_BRANCH=${{ env.branchVer }}"
             "KEA_VERSION=${{ env.vKEA_full }}"
             "PG_INSTALL_VERSION=${{ env.vPostgres }}"
+            "cacheInvalidator=${{ env.cacheInvalidatorUpgrade }}"
           secrets: |
             "aptCacher=${{ secrets.ACNG }}"
           push: ${{ inputs.publish }}
@@ -200,8 +223,8 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           provenance: false
           sbom: false
-          cache-from: type=gha,scope=${{ inputs.architecture }}:${{ inputs.os }}:kea-${{ inputs.binary }}:${{ env.vKEA_semVer }}-${{ env.revision }}
-          cache-to: type=gha,mode=max,scope=${{ inputs.architecture }}:${{ inputs.os }}:kea-${{ inputs.binary }}:${{ env.vKEA_semVer }}-${{ env.revision }}
+          cache-from: type=gha,scope=${{ inputs.architecture }}:${{ inputs.os }}:kea-${{ inputs.binary }}:${{ env.vKEA_semVer }}-${{ env.revision }}${{ env.cacheInvalidator }}
+          cache-to: type=gha,mode=max,scope=${{ inputs.architecture }}:${{ inputs.os }}:kea-${{ inputs.binary }}:${{ env.vKEA_semVer }}-${{ env.revision }}${{ env.cacheInvalidator }}
 
       - name: Export digest
         run: |

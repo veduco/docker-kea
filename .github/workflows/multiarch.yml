@@ -27,6 +27,14 @@ on:
         type: boolean
         description: Include kea-admin?
         default: true
+      cacheInvalidatorUpgrade:
+        type: boolean
+        default: true
+        description: Cause apt upgrade
+      cacheInvalidator:
+        type: boolean
+        default: false
+        description: Invalidate all cache
 
   workflow_call:
     inputs:
@@ -43,6 +51,12 @@ on:
       admin:
         type: boolean
         default: true
+      cacheInvalidatorUpgrade:
+        type: boolean
+        default: true
+      cacheInvalidator:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -139,6 +153,8 @@ jobs:
       admin: ${{ inputs.admin }}
       os: ${{ matrix.job.os }}
       architecture: ${{ matrix.job.architecture }}
+      cacheInvalidatorUpgrade: ${{ inputs.cacheInvalidatorUpgrade }}
+      cacheInvalidator: ${{ inputs.cacheInvalidator }}
 
   merge_platform_containers:
     if: ${{ always() && inputs.publish && !(cancelled() || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'failure')) }}

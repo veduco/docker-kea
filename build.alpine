@@ -1,7 +1,5 @@
 FROM alpine:3.22
 
-RUN apk --no-cache upgrade
-
 RUN apk add --no-cache \
     bash \
     curl
@@ -55,3 +53,6 @@ RUN install -m 0750 -o ${KEA_USER} -g ${KEA_GROUP} -d \
 
 COPY entrypoint.sh /
 ENTRYPOINT [ "/entrypoint.sh" ]
+
+ARG cacheInvalidator
+RUN apk --no-cache upgrade --available

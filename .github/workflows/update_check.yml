@@ -103,3 +103,5 @@ jobs:
             branchVer: ${{ inputs.branchVer }}
             version: ${{ needs.check.outputs.newVersion }}
             admin: true
+            cacheInvalidatorUpgrade: true
+            cacheInvalidator: false

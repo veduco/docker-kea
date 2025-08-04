@@ -4,7 +4,6 @@ FROM debian:${debianBase}-slim
 ARG DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && \
-    apt-get upgrade -y && \
     apt-get install -y \
     bash \
     curl
@@ -36,10 +35,6 @@ RUN --mount=type=secret,id=aptCacher,env=aptCacher \
     #isc-kea-perfdhcp
     #isc-kea-dhcp-ddns
 
-RUN rm -f /etc/apt/sources.list.d/isc*
-RUN apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
-    && apt-get clean -y && rm -rf /var/lib/apt/lists/*
-
 ENV KEA_USER=100 \
     KEA_GROUP=101 \
     KEA_DHCP_DATA_DIR=/kea/leases \
@@ -59,3 +54,10 @@ RUN install -m 0750 -o ${KEA_USER} -g ${KEA_GROUP} -d \
 
 COPY entrypoint.sh /
 ENTRYPOINT [ "/entrypoint.sh" ]
+
+ARG cacheInvalidator
+RUN apt-get upgrade -y
+
+RUN rm -f /etc/apt/sources.list.d/isc*
+RUN apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
+    && apt-get clean -y && rm -rf /var/lib/apt/lists/*
