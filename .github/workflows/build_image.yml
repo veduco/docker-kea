@@ -209,7 +209,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: build.${{ env.dockerfileext }}
+          file: dockerfile.${{ env.dockerfileext }}
           platforms: linux/${{ inputs.architecture }}
           build-args: |
             "debianBase=${{ env.debianBase }}"

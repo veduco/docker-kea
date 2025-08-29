@@ -4,8 +4,19 @@
 # https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
 
 version: 2
+
+multi-ecosystem-groups:
+  local:
+    schedule:
+      interval: "weekly"
+
 updates:
   - package-ecosystem: "github-actions" # See documentation for possible values
     directory: ".github/workflows" # Location of package manifests
-    schedule:
-      interval: "weekly"
+    patterns: ["*.yml"]
+    multi-ecosystem-group: "local"
+
+  - package-ecosystem: "docker"
+    directory: "/"
+    patterns: ["dockerfile.*"]
+    multi-ecosystem-group: "local"
