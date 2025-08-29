@@ -119,7 +119,7 @@ jobs:
           echo "vKEA_major=${vKEA_major}"    | tee -a "$GITHUB_OUTPUT"
           echo "vKEA_minor=${vKEA_minor}"    | tee -a "$GITHUB_OUTPUT"
           echo "vKEA_patch=${vKEA_patch}"    | tee -a "$GITHUB_OUTPUT"
-          echo "revision=$(echo ${full_version##*-} | sed -E 's/(isc|r)//g')" | tee -a $GITHUB_OUTPUT
+          echo "dateVersion=$(echo ${full_version##*-} | sed -E 's/(isc|r)//g')" | tee -a $GITHUB_OUTPUT
 
       - name: Set postgres version
         id: postgres
@@ -135,16 +135,16 @@ jobs:
         job:
           - os: "trixie"
             architecture: "amd64"
-            version: ${{ needs.baseVars.outputs.vKEA_semVer }}-isc${{ needs.baseVars.outputs.revision }}
+            version: ${{ needs.baseVars.outputs.vKEA_semVer }}-isc${{ needs.baseVars.outputs.dateVersion }}
           - os: "trixie"
             architecture: "arm64"
-            version: ${{ needs.baseVars.outputs.vKEA_semVer }}-isc${{ needs.baseVars.outputs.revision }}
+            version: ${{ needs.baseVars.outputs.vKEA_semVer }}-isc${{ needs.baseVars.outputs.dateVersion }}
           - os: "alpine"
             architecture: "amd64"
-            version: ${{ needs.baseVars.outputs.vKEA_semVer }}-r${{ needs.baseVars.outputs.revision }}
+            version: ${{ needs.baseVars.outputs.vKEA_semVer }}-r${{ needs.baseVars.outputs.dateVersion }}
           - os: "alpine"
             architecture: "arm64"
-            version: ${{ needs.baseVars.outputs.vKEA_semVer }}-r${{ needs.baseVars.outputs.revision }}
+            version: ${{ needs.baseVars.outputs.vKEA_semVer }}-r${{ needs.baseVars.outputs.dateVersion }}
     uses: ./.github/workflows/build_image.yml
     secrets: inherit
     with:
@@ -176,7 +176,7 @@ jobs:
           echo "vKEA_major=${{ needs.baseVars.outputs.vKEA_major }}"         | tee -a $GITHUB_ENV
           echo "vKEA_minor=${{ needs.baseVars.outputs.vKEA_minor }}"         | tee -a $GITHUB_ENV
           echo "vKEA_patch=${{ needs.baseVars.outputs.vKEA_patch }}"         | tee -a $GITHUB_ENV
-          echo "revision=${{ needs.baseVars.outputs.revision }}"             | tee -a $GITHUB_ENV
+          echo "dateVersion=${{ needs.baseVars.outputs.dateVersion }}"       | tee -a $GITHUB_ENV
 
       - name: Download Digests
         uses: actions/download-artifact@v4
@@ -215,7 +215,7 @@ jobs:
           labels: |
             maintainer=${{ github.repository_owner }}
           tags: |
-            type=raw,value=${{ env.vKEA_semVer }}-${{ env.revision }}
+            type=raw,value=${{ env.vKEA_semVer }}-${{ env.dateVersion }}
             type=raw,value=${{ env.vKEA_major }}.${{ env.vKEA_minor }}
             type=raw,value=${{ env.vKEA_semVer }}
 
