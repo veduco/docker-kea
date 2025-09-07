@@ -226,7 +226,7 @@ jobs:
           provenance: false
           sbom: false
           cache-from: type=gha,scope=${{ inputs.architecture }}:${{ inputs.os }}:kea-${{ inputs.binary }}:${{ env.vKEA_semVer }}-${{ env.revision }}${{ env.cacheInvalidator }}
-          cache-to: type=gha,mode=max,scope=${{ inputs.architecture }}:${{ inputs.os }}:kea-${{ inputs.binary }}:${{ env.vKEA_semVer }}-${{ env.revision }}${{ env.cacheInvalidator }}
+          cache-to: type=gha,mode=max,scope=${{ inputs.architecture }}:${{ inputs.os }}:kea-${{ inputs.binary }}:${{ env.vKEA_semVer }}-${{ env.revision }}
 
       - name: Export digest
         run: |
