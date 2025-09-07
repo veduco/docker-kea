@@ -76,7 +76,7 @@ jobs:
       vKEA_major: ${{ steps.version.outputs.vKEA_major }}
       vKEA_minor: ${{ steps.version.outputs.vKEA_minor }}
       vKEA_patch: ${{ steps.version.outputs.vKEA_patch }}
-      revision: ${{ steps.version.outputs.revision }}
+      dateVersion: ${{ steps.version.outputs.dateVersion }}
     steps:
       - name: Print inputs
         run: echo "${{ toJSON(inputs) }}"
