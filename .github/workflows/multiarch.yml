@@ -121,6 +121,8 @@ jobs:
           echo "vKEA_patch=${vKEA_patch}"    | tee -a "$GITHUB_OUTPUT"
           echo "dateVersion=$(echo ${full_version##*-} | sed -E 's/(isc|r)//g')" | tee -a "$GITHUB_OUTPUT"
 
+      - name: Print outputs
+        run: echo "${{ toJSON(steps.version.outputs) }}"
 
   allArch:
     if: ${{ always() && !(cancelled() || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'failure')) }}
