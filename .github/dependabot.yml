@@ -18,5 +18,4 @@ updates:
 
   - package-ecosystem: "docker"
     directory: "/"
-    patterns: ["dockerfile.*"]
     multi-ecosystem-group: "local"
