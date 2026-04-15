@@ -10,25 +10,25 @@ RUN apt-get update && \
 
 ARG KEA_BRANCH='3-0'
 ARG KEA_VERSION
-RUN if [ ! -z "${KEA_VERSION}" ]; then KEA_BRANCH="$(echo ${KEA_VERSION%%-*} | cut -d. -f 1)-$(echo ${KEA_VERSION%%-*} | cut -d. -f 2)"; fi && \
+RUN if [ -n "${KEA_VERSION}" ]; then KEA_BRANCH="$(echo ${KEA_VERSION%%-*} | cut -d. -f 1)-$(echo ${KEA_VERSION%%-*} | cut -d. -f 2)"; fi && \
     curl -1sLf "https://dl.cloudsmith.io/public/isc/kea-${KEA_BRANCH}/setup.deb.sh" | version=12 codename=bookworm bash
 
 ARG KEA_ADMIN=true
 ARG PG_INSTALL_VERSION=17
 ENV KEA_EXECUTABLE=dhcp4
 RUN --mount=type=secret,id=aptCacher,env=aptCacher \
-    [ ! -z "${aptCacher}" ] && sed -i -E "s|https://(dl.cloudsmith.io)|https://${aptCacher}/HTTPS///\1|g" /etc/apt/sources.list.d/isc-kea-*.list || true ; \
+    [ -n "${aptCacher}" ] && sed -i -E "s|https://(dl.cloudsmith.io)|https://${aptCacher}/HTTPS///\1|g" /etc/apt/sources.list.d/isc-kea-*.list || true ; \
     apt-get update && apt-get install -y \
-        isc-kea-${KEA_EXECUTABLE}$([ ! -z "${KEA_VERSION}" ] && echo "=${KEA_VERSION}") \
+        isc-kea-"${KEA_EXECUTABLE}"$([ -n "${KEA_VERSION}" ] && echo "=${KEA_VERSION}") \
         isc-kea-hooks \
         isc-kea-pgsql \
         isc-kea-mysql
 
 RUN --mount=type=secret,id=aptCacher,env=aptCacher \
-    [ ! -z "${aptCacher}" ] && sed -i -E "s|https://(dl.cloudsmith.io)|https://${aptCacher}/HTTPS///\1|g" /etc/apt/sources.list.d/isc-kea-*.list || true ; \
+    [ -n "${aptCacher}" ] && sed -i -E "s|https://(dl.cloudsmith.io)|https://${aptCacher}/HTTPS///\1|g" /etc/apt/sources.list.d/isc-kea-*.list || true ; \
     [ "${KEA_ADMIN}" = true ] && apt-get install -y \
-        isc-kea-admin$([ ! -z "${KEA_VERSION}" ] && echo "=${KEA_VERSION}") \
-        postgresql-client-${PG_INSTALL_VERSION} \
+        isc-kea-admin$([ -n "${KEA_VERSION}" ] && echo "=${KEA_VERSION}") \
+        postgresql-client-"${PG_INSTALL_VERSION}" \
         mariadb-client
 
     #isc-kea-gss-tsig
@@ -45,10 +45,10 @@ ENV KEA_USER=100 \
 RUN install -m 0750 -o ${KEA_USER} -g ${KEA_GROUP} -d \
     /kea \
     /kea/config \
-    ${KEA_DHCP_DATA_DIR} \
-    ${KEA_LOG_FILE_DIR} \
-    ${KEA_LEGAL_LOG_DIR} \
-    ${KEA_CONTROL_SOCKET_DIR} \
+    "${KEA_DHCP_DATA_DIR}" \
+    "${KEA_LOG_FILE_DIR}" \
+    "${KEA_LEGAL_LOG_DIR}" \
+    "${KEA_CONTROL_SOCKET_DIR}" \
     && \
     mkdir /entrypoint.d
 
