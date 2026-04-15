@@ -5,17 +5,14 @@
 
 version: 2
 
-multi-ecosystem-groups:
-  local:
-    schedule:
-      interval: "weekly"
-
 updates:
   - package-ecosystem: "github-actions" # See documentation for possible values
     directory: ".github/workflows" # Location of package manifests
     patterns: ["*.yml"]
-    multi-ecosystem-group: "local"
+    schedule:
+      interval: "weekly"
 
   - package-ecosystem: "docker"
     directory: "/"
-    multi-ecosystem-group: "local"
+    schedule:
+      interval: "weekly"
