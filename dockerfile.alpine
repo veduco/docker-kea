@@ -7,7 +7,7 @@ RUN apk add --no-cache \
 ARG KEA_BRANCH='3-0'
 ARG KEA_VERSION
 RUN if [ -n "${KEA_VERSION}" ]; then KEA_BRANCH="$(echo ${KEA_VERSION%%-*} | cut -d. -f 1)-$(echo ${KEA_VERSION%%-*} | cut -d. -f 2)"; fi && \
-    curl -1sLf "https://dl.cloudsmith.io/public/isc/kea-${KEA_BRANCH}/setup.alpine.sh" | bash
+    curl -1sLf "https://dl.cloudsmith.io/public/isc/kea-${KEA_BRANCH}/setup.alpine.sh" | distro=alpine codename=v3.22 bash
 
 ARG KEA_ADMIN=true
 ARG PG_INSTALL_VERSION=17
