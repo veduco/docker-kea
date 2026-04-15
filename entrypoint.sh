@@ -1,9 +1,34 @@
 #!/bin/sh
 set -e
 
+
+#####################
+# Set some variables
+#####################
+
+claimedLogLevel='INFO'
+
+# Script info
+scriptName=$(basename "$0")
+loggerName=$(basename "$0" | sed 's/\.sh//')
+
+# Date strings
+fileDateString='%Y%m%dT%H%M%SZ'
+dateString='%Y-%m-%d %H:%M:%S.%3N'
+
+
+#####################
+# Functions
+#####################
+
 log() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S.%3N')] INFO  [entrypoint] ${1}"
+    echo "[$(date -u +"${dateString}")] ${claimedLogLevel}  [${loggerName}] ${1}"
 }
+
+
+#####################
+# Body
+#####################
 
 log "Starting Kea ${KEA_EXECUTABLE} container"
 
@@ -11,7 +36,7 @@ log "Starting Kea ${KEA_EXECUTABLE} container"
 # aborted (power shutdown for instance). Kea does not start if the pid file
 # from the previous process still exists.
 # https://github.com/JonasAlfredsson/docker-kea/pull/13#discussion_r1309289293
-rm -fv /run/kea/*.kea-${KEA_EXECUTABLE}.pid
+rm -fv /run/kea/*.kea-"${KEA_EXECUTABLE}".pid
 
 # Execute any potential shell scripts in the entrypoint.d/ folder.
 find "/entrypoint.d/" -follow -type f -print | sort -V | while read -r f; do
@@ -30,4 +55,4 @@ find "/entrypoint.d/" -follow -type f -print | sort -V | while read -r f; do
 done
 
 # Feed all the command parameters directly to the defined executable.
-exec /usr/sbin/kea-${KEA_EXECUTABLE} $@
+exec /usr/sbin/kea-"${KEA_EXECUTABLE}" $@
