@@ -11,7 +11,7 @@ RUN apt-get update && \
 ARG KEA_BRANCH='3-0'
 ARG KEA_VERSION
 RUN if [ -n "${KEA_VERSION}" ]; then KEA_BRANCH="$(echo ${KEA_VERSION%%-*} | cut -d. -f 1)-$(echo ${KEA_VERSION%%-*} | cut -d. -f 2)"; fi && \
-    curl -1sLf "https://dl.cloudsmith.io/public/isc/kea-${KEA_BRANCH}/setup.deb.sh" | version=12 codename=bookworm bash
+    curl -1sLf "https://dl.cloudsmith.io/public/isc/kea-${KEA_BRANCH}/setup.deb.sh" | version=13 codename=trixie bash
 
 ARG KEA_ADMIN=true
 ARG PG_INSTALL_VERSION=17
